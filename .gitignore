@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+._*
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Composer
+/vendor/
+
+
+# Testing
+.phpunit.result.cache
+.phpunit.cache/
+coverage/
+
+# Environment
+.env
+.env.local
+
+# AI/LLM
+CLAUDE.md
+PROVENANCE.md
