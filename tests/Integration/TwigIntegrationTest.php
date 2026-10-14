@@ -7,6 +7,7 @@ namespace eSheep\Twigs\Tests\Integration;
 use eSheep\Twigs\Extension;
 use PHPUnit\Framework\TestCase;
 use Twig\Environment;
+use Twig\Error\SyntaxError;
 use Twig\Loader\ArrayLoader;
 
 final class TwigIntegrationTest extends TestCase
@@ -42,6 +43,16 @@ final class TwigIntegrationTest extends TestCase
         self::assertStringStartsWith('<span>', $result);
     }
 
+    public function testTagFunctionStringShortcut(): void
+    {
+        self::assertSame('<p>Hello</p>', $this->render("{{ tag('p', 'Hello') }}"));
+        // yiisoft/html's encode() leaves quotes as-is (ENT_NOQUOTES), which is safe for tag content
+        self::assertSame(
+            "<p>&lt;script&gt;alert('Hello');&lt;/script&gt;</p>",
+            $this->render("{{ tag('p', \"<script>alert('Hello');</script>\") }}"),
+        );
+    }
+
     public function testAttrFunction(): void
     {
         $result = $this->render("{{ attr({class: 'a b', id: 'x'}) }}");
@@ -65,6 +76,38 @@ final class TwigIntegrationTest extends TestCase
         $result = $this->render("{{ '<div class=\"a\">Hi</div>'|attr({class: 'b'}) }}");
         self::assertStringContainsString('class="a b"', $result);
         self::assertStringContainsString('>Hi</div>', $result);
+    }
+
+    public function testAttrFilterOnPlainString(): void
+    {
+        self::assertSame('Hey', $this->render("{{ 'Hey'|attr({class: 'foo'}) }}"));
+    }
+
+    public function testRemoveClassFilter(): void
+    {
+        self::assertSame('<div>', $this->render("{{ '<div class=\"foo\">'|remove_class('foo') }}"));
+        self::assertSame('<div class="bar">', $this->render("{{ '<div class=\"foo bar\">'|remove_class('foo') }}"));
+        self::assertSame('<div class="baz">', $this->render("{{ '<div class=\"foo bar baz\">'|remove_class(['foo', 'bar']) }}"));
+        self::assertSame('foo', $this->render("{{ 'foo'|remove_class('foo') }}"));
+    }
+
+    public function testRayFilterPassesValueThroughWithSameEscaping(): void
+    {
+        $twig = new Environment(new ArrayLoader());
+        $twig->addExtension(new Extension());
+        $render = fn(string $template) => $twig->createTemplate($template)->render(['v' => '<b>', 'n' => 42]);
+
+        $errorLog = ini_set('error_log', '/dev/null');
+        try {
+            self::assertSame($render('{{ v }}'), $render('{{ v|ray }}'));
+            self::assertSame('&lt;b&gt;', $render('{{ v|ray }}'));
+            self::assertSame("<p>x</p>", $render("{{ tag('p', 'x')|ray }}"));
+            self::assertSame('42', $render("{{ n|ray('label') }}"));
+            self::assertSame('kept', $render("{% set x = 'kept'|ray %}{{ x }}"));
+            self::assertSame('', $render('{{ ray(v) }}'));
+        } finally {
+            ini_set('error_log', $errorLog);
+        }
     }
 
     public function testTwMergeFilter(): void
@@ -135,6 +178,24 @@ final class TwigIntegrationTest extends TestCase
         self::assertSame('<div><span>inner</span></div>', $result);
     }
 
+    public function testNestedMixedTagBlocks(): void
+    {
+        $result = $this->render("{% html_tag 'div' %}{% tag 'span' %}inner{% endtag %}{% endhtml_tag %}");
+        self::assertSame('<div><span>inner</span></div>', $result);
+    }
+
+    public function testHtmlTagBlockRejectsEndtag(): void
+    {
+        $this->expectException(SyntaxError::class);
+        $this->render("{% html_tag 'span' %}World{% endtag %}");
+    }
+
+    public function testTagBlockRejectsEndhtmlTag(): void
+    {
+        $this->expectException(SyntaxError::class);
+        $this->render("{% tag 'span' %}World{% endhtml_tag %}");
+    }
+
     public function testTagBlockDynamicName(): void
     {
         $result = $this->render("{% set t = 'h1' %}{% tag t %}Title{% endtag %}");
@@ -167,6 +228,13 @@ final class TwigIntegrationTest extends TestCase
     {
         $a = $this->render("{{ '<div>'|attr({class: 'x'}) }}");
         $b = $this->render("{{ '<div>'|html_attr({class: 'x'}) }}");
+        self::assertSame($a, $b);
+    }
+
+    public function testRemoveClassFilterAliasEquivalence(): void
+    {
+        $a = $this->render("{{ '<div class=\"x y\">'|remove_class('x') }}");
+        $b = $this->render("{{ '<div class=\"x y\">'|html_remove_class('x') }}");
         self::assertSame($a, $b);
     }
 
@@ -205,9 +273,9 @@ final class TwigIntegrationTest extends TestCase
     public function testRemoveClassInTemplate(): void
     {
         $result = $this->render(
-            "{{ tag('div', {class: 'a b c', removeClass: 'b', html: 'x'}) }}",
+            "{{ tag('div', {class: 'a b c', remove_class: 'b', html: 'x'}) }}",
         );
         self::assertStringContainsString('class="a c"', $result);
-        self::assertStringNotContainsString('removeClass', $result);
+        self::assertStringNotContainsString('remove_class', $result);
     }
 }

@@ -280,7 +280,7 @@ final class Html
 
             switch ($name) {
                 case 'class':
-                case 'removeClass':
+                case 'remove_class':
                     $normalized[$name] = static::explodeClass($value);
                     break;
                 case 'style':
@@ -306,8 +306,8 @@ final class Html
             }
         }
 
-        if (isset($normalized['removeClass'])) {
-            $removeClasses = ArrayHelper::remove($normalized, 'removeClass');
+        if (isset($normalized['remove_class'])) {
+            $removeClasses = ArrayHelper::remove($normalized, 'remove_class');
             $normalized['class'] = array_diff($normalized['class'] ?? [], $removeClasses);
         }
 

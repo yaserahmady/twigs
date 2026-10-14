@@ -213,20 +213,20 @@ final class HtmlTest extends TestCase
 
     public function testNormalizeRemoveClass(): void
     {
-        $result = Html::normalizeTagAttributes(['class' => 'a b c', 'removeClass' => 'b']);
+        $result = Html::normalizeTagAttributes(['class' => 'a b c', 'remove_class' => 'b']);
         self::assertSame(['a', 'c'], array_values($result['class']));
-        self::assertArrayNotHasKey('removeClass', $result);
+        self::assertArrayNotHasKey('remove_class', $result);
     }
 
     public function testNormalizeRemoveClassArray(): void
     {
-        $result = Html::normalizeTagAttributes(['class' => 'a b c', 'removeClass' => ['a', 'c']]);
+        $result = Html::normalizeTagAttributes(['class' => 'a b c', 'remove_class' => ['a', 'c']]);
         self::assertSame(['b'], array_values($result['class']));
     }
 
     public function testNormalizeRemoveClassNoMatchingClass(): void
     {
-        $result = Html::normalizeTagAttributes(['removeClass' => 'a']);
+        $result = Html::normalizeTagAttributes(['remove_class' => 'a']);
         self::assertSame([], array_values($result['class']));
     }
 

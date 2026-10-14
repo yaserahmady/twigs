@@ -32,7 +32,7 @@ final class ExtensionTest extends TestCase
     public function testGetFiltersReturnsExpectedNames(): void
     {
         $names = array_map(fn(TwigFilter $f) => $f->getName(), $this->ext->getFilters());
-        self::assertSame(['html_attr', 'attr', 'merge_attributes', 'tailwind_merge', 'tw_merge', 'ray'], $names);
+        self::assertSame(['html_attr', 'attr', 'html_remove_class', 'remove_class', 'merge_attributes', 'tailwind_merge', 'tw_merge', 'ray'], $names);
     }
 
     public function testGetTokenParsersReturnsTwo(): void
@@ -65,11 +65,26 @@ final class ExtensionTest extends TestCase
         self::assertStringContainsString('&lt;script&gt;', $result);
     }
 
-    public function testTagFunctionTextOverridesHtml(): void
+    public function testTagFunctionHtmlOverridesText(): void
     {
         $result = Extension::tagFunction('div', ['html' => 'raw', 'text' => 'encoded']);
-        self::assertStringContainsString('encoded', $result);
-        self::assertStringNotContainsString('raw', $result);
+        self::assertSame('<div>raw</div>', $result);
+    }
+
+    public function testTagFunctionNullHtmlFallsBackToText(): void
+    {
+        $result = Extension::tagFunction('div', ['html' => null, 'text' => '<b>']);
+        self::assertSame('<div>&lt;b&gt;</div>', $result);
+    }
+
+    public function testTagFunctionStringIsText(): void
+    {
+        self::assertSame('<p>Hello</p>', Extension::tagFunction('p', 'Hello'));
+    }
+
+    public function testTagFunctionStringIsEncoded(): void
+    {
+        self::assertSame('<p>&lt;b&gt;bold&lt;/b&gt;</p>', Extension::tagFunction('p', '<b>bold</b>'));
     }
 
     public function testTagFunctionRemovesHtmlAndTextFromAttributes(): void
@@ -94,28 +109,52 @@ final class ExtensionTest extends TestCase
 
     public function testAttrFilterReturnsOriginalOnInvalidHtml(): void
     {
-        $original = 'not a tag';
-        // Suppress the E_USER_WARNING
-        $result = @Extension::attrFilter($original, ['id' => 'x']);
-        self::assertSame($original, $result);
+        self::assertSame('not a tag', Extension::attrFilter('not a tag', ['id' => 'x']));
     }
 
-    public function testAttrFilterTriggersWarningOnInvalidHtml(): void
+    // --- rayFilter() ---
+
+    public function testRayFilterReturnsValue(): void
     {
-        $warning = null;
-        set_error_handler(function (int $errno, string $errstr) use (&$warning) {
-            $warning = $errstr;
-            return true;
-        }, E_USER_WARNING);
-
+        $errorLog = ini_set('error_log', '/dev/null');
         try {
-            Extension::attrFilter('not a tag', ['id' => 'x']);
+            self::assertSame(['a' => 1], Extension::rayFilter(['a' => 1], 'label'));
         } finally {
-            restore_error_handler();
+            ini_set('error_log', $errorLog);
         }
+    }
 
-        self::assertNotNull($warning);
-        self::assertStringContainsString('invalid HTML tag', $warning);
+    // --- removeClassFilter() ---
+
+    public function testRemoveClassFilterRemovesOnlyClass(): void
+    {
+        self::assertSame('<div>', Extension::removeClassFilter('<div class="foo">', 'foo'));
+    }
+
+    public function testRemoveClassFilterKeepsOtherClasses(): void
+    {
+        self::assertSame('<div class="bar">', Extension::removeClassFilter('<div class="foo bar">', 'foo'));
+    }
+
+    public function testRemoveClassFilterArray(): void
+    {
+        self::assertSame('<div class="baz">', Extension::removeClassFilter('<div class="foo bar baz">', ['foo', 'bar']));
+    }
+
+    public function testRemoveClassFilterKeepsOtherAttributesAndContent(): void
+    {
+        $result = Extension::removeClassFilter('<a href="/x" class="foo bar">Link</a>', 'foo');
+        self::assertSame('<a href="/x" class="bar">Link</a>', $result);
+    }
+
+    public function testRemoveClassFilterMissingClassLeavesClassesIntact(): void
+    {
+        self::assertSame('<div class="foo">', Extension::removeClassFilter('<div class="foo">', 'bar'));
+    }
+
+    public function testRemoveClassFilterReturnsOriginalOnInvalidHtml(): void
+    {
+        self::assertSame('foo', Extension::removeClassFilter('foo', 'foo'));
     }
 
     // --- mergeAttributes() ---

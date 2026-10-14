@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace eSheep\Twigs;
 
+use eSheep\Twigs\NodeVisitor\OwnCallablesNodeVisitor;
 use eSheep\Twigs\TokenParser\TagTokenParser;
 use TalesFromADev\TailwindMerge\TailwindMerge;
 use TalesFromADev\TailwindMerge\TailwindMergeInterface;
@@ -27,6 +28,12 @@ class Extension extends AbstractExtension
     /** @var array{remove_duplicate_classes: bool, tailwind_merge: bool} */
     private array $mergeOptions;
 
+    /** @var TwigFunction[]|null */
+    private ?array $functions = null;
+
+    /** @var TwigFilter[]|null */
+    private ?array $filters = null;
+
     /**
      * @param array{remove_duplicate_classes?: bool, tailwind_merge?: bool} $mergeOptions
      *   Default options for the merge_attributes filter.
@@ -44,7 +51,7 @@ class Extension extends AbstractExtension
 
     public function getFunctions(): array
     {
-        return [
+        return $this->functions ??= [
             // html_cva / cva — from twig/html-extra
             new TwigFunction('html_cva', [self::class, 'cva']),
             new TwigFunction('cva', [self::class, 'cva']),
@@ -64,10 +71,14 @@ class Extension extends AbstractExtension
 
     public function getFilters(): array
     {
-        return [
+        return $this->filters ??= [
             // html_attr / attr — ported from Craft CMS (modifies attributes on existing HTML tags)
             new TwigFilter('html_attr', [self::class, 'attrFilter'], ['is_safe' => ['html']]),
             new TwigFilter('attr', [self::class, 'attrFilter'], ['is_safe' => ['html']]),
+
+            // html_remove_class / remove_class — ported from Craft CMS (removes classes from existing HTML tags)
+            new TwigFilter('html_remove_class', [self::class, 'removeClassFilter'], ['is_safe' => ['html']]),
+            new TwigFilter('remove_class', [self::class, 'removeClassFilter'], ['is_safe' => ['html']]),
 
             // merge_attributes — merge two attribute arrays with optional class dedup/tailwind merge
             new TwigFilter('merge_attributes', [$this, 'mergeAttributes']),
@@ -76,8 +87,8 @@ class Extension extends AbstractExtension
             new TwigFilter('tailwind_merge', [$this, 'tailwindMerge'], ['is_variadic' => true]),
             new TwigFilter('tw_merge', [$this, 'tailwindMerge'], ['is_variadic' => true]),
 
-            // Spatie Ray
-            new TwigFilter('ray', [self::class, 'ray']),
+            // Spatie Ray — passes the value through, keeping its escaping status
+            new TwigFilter('ray', [self::class, 'rayFilter'], ['preserves_safety' => ['all']]),
         ];
     }
 
@@ -86,6 +97,13 @@ class Extension extends AbstractExtension
         return [
             new TagTokenParser('tag'),
             new TagTokenParser('html_tag'),
+        ];
+    }
+
+    public function getNodeVisitors(): array
+    {
+        return [
+            new OwnCallablesNodeVisitor($this->getFunctions(), $this->getFilters()),
         ];
     }
 
@@ -110,21 +128,25 @@ class Extension extends AbstractExtension
      * Generates an HTML tag.
      *
      * Supports `html` and `text` keys in attributes:
-     * - `html`: raw HTML content for the tag body.
+     * - `html`: raw HTML content for the tag body. Takes precedence over `text`.
      * - `text`: text content (will be HTML-encoded) for the tag body.
      *
+     * Passing a string instead of an array is a shortcut for `{text: '...'}`.
+     *
      * @param string $type The tag name (e.g., 'div', 'span').
-     * @param array $attributes Tag attributes. May include `html` and `text` keys.
+     * @param string|array $attributes Tag attributes (may include `html` and `text` keys), or the tag's text.
      */
-    public static function tagFunction(string $type, array $attributes = []): string
+    public static function tagFunction(string $type, string|array $attributes = ''): string
     {
-        $html = ArrayHelper::remove($attributes, 'html', '');
-        $text = ArrayHelper::remove($attributes, 'text');
-
-        if ($text !== null) {
-            $html = Html::encode($text);
+        if (is_array($attributes)) {
+            $html = ArrayHelper::remove($attributes, 'html');
+            $text = ArrayHelper::remove($attributes, 'text');
+        } else {
+            $text = $attributes;
+            $attributes = [];
         }
 
+        $html ??= Html::encode($text ?? '');
         return Html::tag($type, $html, $attributes);
     }
 
@@ -141,7 +163,30 @@ class Extension extends AbstractExtension
         try {
             return Html::modifyTagAttributes($tag, $attributes);
         } catch (\InvalidArgumentException) {
-            trigger_error("Could not modify tag attributes: invalid HTML tag", E_USER_WARNING);
+            return $tag;
+        }
+    }
+
+    /**
+     * Removes a class (or classes) from an existing HTML tag string.
+     *
+     * Returns the original string unchanged if it contains no valid HTML tag.
+     *
+     * @param string $tag The HTML tag string to modify.
+     * @param string|string[] $class The class or classes to remove.
+     */
+    public static function removeClassFilter(string $tag, array|string $class): string
+    {
+        try {
+            $oldClasses = Html::parseTagAttributes($tag)['class'] ?? [];
+            $newClasses = array_filter($oldClasses, fn(string $oldClass) => is_string($class) ? $oldClass !== $class : !in_array($oldClass, $class, true));
+
+            $newTag = Html::modifyTagAttributes($tag, ['class' => false]);
+            if (!empty($newClasses)) {
+                $newTag = Html::modifyTagAttributes($newTag, ['class' => $newClasses]);
+            }
+            return $newTag;
+        } catch (\InvalidArgumentException) {
             return $tag;
         }
     }
@@ -197,6 +242,16 @@ class Extension extends AbstractExtension
         $this->tailwindMerge ??= new TailwindMerge();
 
         return $this->tailwindMerge->merge($value, ...$additionalClasses);
+    }
+
+    /**
+     * Sends a value to Ray (see {@see ray()}) and returns it unchanged, so `{{ value|ray }}` still prints the value.
+     */
+    public static function rayFilter(mixed $value, mixed ...$args): mixed
+    {
+        self::ray($value, ...$args);
+
+        return $value;
     }
 
     public static function ray(mixed ...$args)

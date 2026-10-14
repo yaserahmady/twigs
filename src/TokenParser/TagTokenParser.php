@@ -39,7 +39,7 @@ class TagTokenParser extends AbstractTokenParser
     {
         $lineno = $token->getLine();
         $stream = $this->parser->getStream();
-        $endTagName = 'endtag';
+        $endTagName = 'end' . $this->tagName;
 
         $nodes = [
             'name' => $this->parser->parseExpression(),
