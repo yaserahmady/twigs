@@ -1,0 +1,104 @@
+---
+title: Functions
+description: Reference for the tag(), attr(), cva() and ray() Twig functions in eSheep Twigs — arguments, return values, aliases and examples.
+sidebar:
+  order: 1
+---
+
+## `tag`
+
+Alias: `html_tag`
+
+```twig
+tag(name, attributes = '')
+```
+
+Builds a complete HTML element.
+
+- **`name`**: the tag name, such as `div`, `a` or `img`.
+- **`attributes`**: an [attribute hash](/guides/attributes), or a string. Two keys in the hash set the element's content instead of becoming attributes:
+  - **`text`**: content, HTML-encoded.
+  - **`html`**: content, inserted as raw HTML. If both are set, `html` wins.
+
+  A string is a shortcut for `{text: '...'}`.
+
+The result is marked as safe HTML, so autoescaping doesn't encode it a second time.
+
+```twig
+{{ tag('p', 'Hello <world>') }}
+{# <p>Hello &lt;world&gt;</p> #}
+
+{{ tag('a', {href: '/docs', class: ['link', 'link-primary'], text: 'Docs'}) }}
+{# <a href="/docs" class="link link-primary">Docs</a> #}
+
+{{ tag('div', {html: '<b>raw</b>', text: 'ignored'}) }}
+{# <div><b>raw</b></div> #}
+```
+
+Void elements (`area`, `base`, `br`, `col`, `embed`, `hr`, `img`, `input`, `link`, `meta`, `param`, `source`, `track` and `wbr`) render without content or a closing tag.
+
+:::danger[`html` isn't escaped]
+Never put user input in `html`. Use `text`, or the string shortcut, for anything that isn't trusted markup.
+:::
+
+For content that's easier to write as template code, use the [`{% tag %}` block](/reference/tags).
+
+## `attr`
+
+Alias: `html_attr`
+
+```twig
+attr(attributes)
+```
+
+Renders an [attribute hash](/guides/attributes) as an attribute string. The string starts with a space when there's at least one attribute and is empty otherwise, so put the call directly after the tag name:
+
+```twig
+<input{{ attr({type: 'checkbox', name: 'agree', checked: true, disabled: false, required: null}) }}>
+{# <input type="checkbox" name="agree" checked> #}
+
+<div{{ attr({}) }}>
+{# <div> #}
+```
+
+The result is marked as safe HTML. twig/html-extra also defines an `html_attr()` function, but templates always get this one: see [When other extensions use the same names](/installation#when-other-extensions-use-the-same-names).
+
+## `cva`
+
+Alias: `html_cva`
+
+```twig
+cva(base = [], variants = {}, compoundVariants = [], defaultVariant = {})
+```
+
+Creates a class variant authority (CVA) object from [twig/html-extra](https://twig.symfony.com/doc/3.x/functions/html_cva.html). Call `.apply()` on it with the chosen variants, plus any extra classes, to get a class string.
+
+- **`base`**: classes that always apply, as a string or a list.
+- **`variants`**: a hash of variant name to a hash of option name to classes.
+- **`compoundVariants`**: a list of hashes. Each one lists variant values and a `class` that applies when all of them match.
+- **`defaultVariant`**: the option each variant uses when `.apply()` doesn't set it or sets it to `null`. The name is singular, matching twig/html-extra.
+
+Named arguments work, which makes longer definitions easier to read:
+
+```twig
+{{ cva('btn', {size: {sm: 'btn-sm', lg: 'btn-lg'}}, [], {size: 'sm'}).apply({}) }}
+{# btn btn-sm #}
+
+{{ cva(base: 'btn', variants: {size: {sm: 'btn-sm', lg: 'btn-lg'}}, defaultVariant: {size: 'sm'}).apply({size: 'lg'}, 'w-full') }}
+{# btn btn-lg w-full #}
+
+{{ cva(base: 'btn', variants: {color: {primary: 'p', danger: 'd'}, size: {sm: 's', lg: 'l'}}, compoundVariants: [{color: 'danger', size: 'lg', class: 'shadow'}]).apply({color: 'danger', size: 'lg'}) }}
+{# btn d l shadow #}
+```
+
+[Building components](/guides/components) shows `cva()` inside a reusable template.
+
+## `ray`
+
+```twig
+ray(...values)
+```
+
+Sends values to [Spatie Ray](https://spatie.be/products/ray) when the global `ray()` PHP function exists, for example after `composer require spatie/ray`. Without it, each value is written to PHP's error log with `print_r()`.
+
+It outputs nothing, so `{{ ray(user) }}` leaves no trace in the page. To debug a value while still printing it, use the [`|ray` filter](/reference/filters#ray).

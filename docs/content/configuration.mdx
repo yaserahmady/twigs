@@ -1,0 +1,57 @@
+---
+title: Configuration
+description: Constructor options for eSheep\Twigs\Extension — inject a configured TailwindMerge instance and set the default options of the merge_attributes filter.
+sidebar:
+  order: 3
+---
+
+The extension works without configuration. Its constructor takes two optional named arguments.
+
+```php
+use eSheep\Twigs\Extension;
+use TalesFromADev\TailwindMerge\TailwindMerge;
+
+$twig->addExtension(new Extension(
+    tailwindMerge: new TailwindMerge(),
+    mergeOptions: [
+        'remove_duplicate_classes' => true,
+        'tailwind_merge' => true,
+    ],
+));
+```
+
+## `tailwindMerge`
+
+An instance of `TalesFromADev\TailwindMerge\TailwindMergeInterface`, used by [`|tailwind_merge`](/reference/filters#tailwind_merge) and by [`|merge_attributes`](/reference/filters#merge_attributes).
+
+Without one, the extension creates a `TailwindMerge` with the default configuration the first time it needs to merge classes. Pass your own to use a custom Tailwind configuration or a PSR-16 cache:
+
+```php
+use TalesFromADev\TailwindMerge\TailwindMerge;
+
+$twig->addExtension(new Extension(
+    tailwindMerge: new TailwindMerge(
+        additionalConfiguration: [/* see the tailwind-merge-php docs */],
+        cache: $psr16Cache,
+    ),
+));
+```
+
+The options `additionalConfiguration` accepts are covered in the [tailwind-merge-php documentation](https://github.com/tales-from-a-dev/tailwind-merge-php/blob/main/docs/index.md#configuration).
+
+## `mergeOptions`
+
+Defaults for [`|merge_attributes`](/reference/filters#merge_attributes). A call can still override them through the filter's third argument.
+
+| Key | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `remove_duplicate_classes` | `bool` | `true` | Removes repeated class names after merging. |
+| `tailwind_merge` | `bool` | `true` | Resolves conflicting Tailwind classes after merging, so later classes win. |
+
+If your project doesn't use Tailwind CSS, turn off `tailwind_merge`. Otherwise classes that happen to look like Tailwind utilities can be dropped:
+
+```php
+$twig->addExtension(new Extension(
+    mergeOptions: ['tailwind_merge' => false],
+));
+```

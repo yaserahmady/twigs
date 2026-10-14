@@ -1,0 +1,3 @@
+# Keep the docs site and CI config out of the Composer package
+/docs export-ignore
+/.github export-ignore

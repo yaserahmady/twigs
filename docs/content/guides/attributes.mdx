@@ -1,0 +1,100 @@
+---
+title: Attribute hashes
+description: The attribute hash format every eSheep Twigs helper accepts — encoding, boolean attributes, class and style values, data/aria/hx prefixes, and the remove_class pseudo-attribute.
+sidebar:
+  order: 1
+---
+
+`tag()`, `attr()`, `|attr`, `|merge_attributes` and `{% tag %}` all take attributes as a Twig hash. This page covers how each kind of value renders. The examples use `attr()`, which renders the hash and nothing else.
+
+## Plain values
+
+Strings and numbers render as quoted attributes, HTML-encoded:
+
+```twig
+<div{{ attr({title: 'Say "hi" & <bye>'}) }}>
+{# <div title="Say &quot;hi&quot; &amp; &lt;bye&gt;"> #}
+```
+
+Names you don't recognize pass through as they are, so Alpine.js and similar libraries work:
+
+```twig
+{{ tag('div', {'@click': 'open = true', 'x-data': '{open: false}'}) }}
+{# <div @click="open = true" x-data="{open: false}"></div> #}
+```
+
+Attributes render in the order you write them.
+
+## Booleans and empty values
+
+`true` renders the attribute without a value. `false` and `null` leave it out, which makes conditional attributes a one-liner:
+
+```twig
+<input{{ attr({type: 'checkbox', name: 'agree', checked: true, disabled: false, required: null}) }}>
+{# <input type="checkbox" name="agree" checked> #}
+```
+
+An empty string also renders without a value. HTML treats `alt` and `alt=""` the same:
+
+```twig
+{{ tag('img', {src: '/logo.png', alt: ''}) }}
+{# <img src="/logo.png" alt> #}
+```
+
+## `class`
+
+A class can be a space-separated string or a list. An empty value leaves the attribute out.
+
+```twig
+{{ tag('a', {href: '/docs', class: ['link', 'link-primary'], text: 'Docs'}) }}
+{# <a href="/docs" class="link link-primary">Docs</a> #}
+
+<div{{ attr({class: ''}) }}>
+{# <div> #}
+```
+
+### `remove_class`
+
+`remove_class` is a pseudo-attribute: it removes classes from the `class` value in the same hash, and never renders itself. It takes a string or a list.
+
+```twig
+{{ tag('div', {class: 'a b c', remove_class: 'b'}) }}
+{# <div class="a c"></div> #}
+```
+
+It only sees the `class` in its own hash. It doesn't remove classes already on a tag passed to `|attr`, or classes coming from the other side of `|merge_attributes`. Use the [`|remove_class` filter](/reference/filters#remove_class) for an existing tag.
+
+## `style`
+
+A style can be a CSS string or a hash of properties. Both render as `property: value;` pairs:
+
+```twig
+<div{{ attr({style: {color: 'red', 'font-size': '12px'}}) }}>
+{# <div style="color: red; font-size: 12px;"> #}
+
+<div{{ attr({style: 'color: red; background: url(a;b.png)'}) }}>
+{# <div style="color: red; background: url(a;b.png);"> #}
+```
+
+Semicolons inside `url()` don't split the declaration.
+
+## Data, ARIA and htmx prefixes
+
+For the prefixes `data`, `aria`, `hx`, `data-hx`, `ng` and `data-ng`, a nested hash expands into one attribute per key. A flat key such as `data-foo` works too, and both forms can be mixed:
+
+```twig
+<button{{ attr({aria: {label: 'Close', expanded: 'false'}}) }}>
+{# <button aria-label="Close" aria-expanded="false"> #}
+
+<button{{ attr({hx: {post: '/save', target: '#form'}, 'hx-swap': 'outerHTML'}) }}>
+{# <button hx-post="/save" hx-target="#form" hx-swap="outerHTML"> #}
+```
+
+A hash or list inside a data attribute is JSON-encoded:
+
+```twig
+<div{{ attr({data: {id: 42, user: {name: 'Ada'}}, 'data-foo': 'bar'}) }}>
+{# <div data-id="42" data-user='{"name":"Ada"}' data-foo="bar"> #}
+```
+
+Keeping prefixed attributes in one nested hash is what lets [`|merge_attributes`](/reference/filters#merge_attributes) merge them key by key.

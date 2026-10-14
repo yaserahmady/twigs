@@ -1,0 +1,62 @@
+---
+title: Installation
+description: Install esheep/twigs with Composer and register the extension on a Twig environment, in plain PHP or in Symfony.
+sidebar:
+  order: 2
+---
+
+## Requirements
+
+- PHP 8.1 or newer
+- Twig 3.13 or newer
+
+Composer installs the rest: twig/html-extra, yiisoft/html, yiisoft/arrays and tailwind-merge-php.
+
+## Install
+
+```bash
+composer require esheep/twigs
+```
+
+## Register the extension
+
+Add `eSheep\Twigs\Extension` to your Twig environment. It's the only class you need to register: it brings every function, filter and tag in this package, including `cva()` from twig/html-extra.
+
+```php
+use eSheep\Twigs\Extension;
+use Twig\Environment;
+use Twig\Loader\FilesystemLoader;
+
+$twig = new Environment(new FilesystemLoader(__DIR__ . '/templates'));
+$twig->addExtension(new Extension());
+```
+
+Any framework that gives you the `Twig\Environment` works the same way: call `addExtension()` on it. To change the defaults, pass [constructor options](/configuration).
+
+### Symfony
+
+With autoconfiguration on (the default in `config/services.yaml`), registering the class as a service is enough. Symfony tags it as a Twig extension:
+
+```yaml config/services.yaml
+services:
+    eSheep\Twigs\Extension: ~
+```
+
+twig/extra-bundle also registers twig/html-extra's `HtmlExtension`, which defines its own `html_attr()` and `html_cva()`. That's fine: see the next section.
+
+## When other extensions use the same names
+
+When two extensions define a function or filter with the same name, Twig normally keeps the one registered last, without an error, and frameworks decide that order. This package doesn't rely on the order: when a template compiles, every call to one of its function or filter names uses this package's version. So `html_attr()` always renders attributes as described in these docs, even with twig/html-extra's `HtmlExtension` registered after it.
+
+This covers functions and filters only. The `{% tag %}` and `{% html_tag %}` block tags follow Twig's usual rule, so another extension that defines a tag with the same name and is registered later takes it over.
+
+## Check that it works
+
+Render a template that uses one of the helpers:
+
+```php
+echo $twig->createTemplate("{{ tag('p', 'Hello <world>') }}")->render();
+// <p>Hello &lt;world&gt;</p>
+```
+
+Next, read [Attribute hashes](/guides/attributes): every helper takes the same attribute format.

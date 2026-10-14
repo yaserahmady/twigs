@@ -1,0 +1,57 @@
+---
+title: Tags
+description: Reference for the tag and html_tag block tags in eSheep Twigs — wrap template content in an element built from a tag name and an attribute hash.
+sidebar:
+  order: 3
+---
+
+## `tag`
+
+Alias: `html_tag`
+
+```twig
+{% tag name with attributes %}
+    content
+{% endtag %}
+```
+
+Renders the block's content and wraps it in an element. `with attributes` is optional and takes an [attribute hash](/guides/attributes). The name can be any expression, such as a variable.
+
+Each tag closes with its own end tag: `{% tag %}` with `{% endtag %}`, and `{% html_tag %}` with `{% endhtml_tag %}`. Using the other closer is a syntax error.
+
+```twig
+{% tag 'nav' with {class: 'main-nav', aria: {label: 'Main'}} %}
+    <a href="/">Home</a>
+{% endtag %}
+{# <nav class="main-nav" aria-label="Main"><a href="/">Home</a></nav> #}
+
+{% html_tag 'section' with {id: 'hero'} %}
+    <h1>Welcome</h1>
+{% endhtml_tag %}
+{# <section id="hero"><h1>Welcome</h1></section> #}
+```
+
+The content is ordinary template code. Autoescaping applies to the variables you print inside it, as it does anywhere else:
+
+```twig
+{% set name = '<script>' %}{% tag 'p' %}Hi {{ name }}{% endtag %}
+{# <p>Hi &lt;script&gt;</p> #}
+```
+
+Blocks can be nested, and the tag name can be dynamic:
+
+```twig
+{% set level = 'h2' %}{% tag 'div' %}{% tag level %}Title{% endtag %}{% endtag %}
+{# <div><h2>Title</h2></div> #}
+```
+
+## Differences from `tag()`
+
+- **The content comes from the block.** `text` and `html` aren't special keys here. They render as ordinary attributes:
+
+  ```twig
+  {% tag 'div' with {text: 'x'} %}body{% endtag %}
+  {# <div text="x">body</div> #}
+  ```
+
+- **Void elements drop the content.** `{% tag 'img' %}` renders only the opening tag, whatever the block contains.

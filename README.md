@@ -1,6 +1,11 @@
 # Twigs
 
+> [!WARNING]
+> **Alpha software, not ready for public use.** Twigs is built for my agency's own projects. Names, behavior and output can change in any release, without notice or upgrade notes.
+
 A framework-agnostic Twig extension that bundles useful functions, filters, and tags into a single entry point.
+
+**Documentation:** https://yaserahmady.github.io/twigs/ (source in [`docs/`](docs/content)). Coding agents can use the [`esheep-twigs` skill](skills/esheep-twigs/SKILL.md).
 
 ## Installation
 
@@ -42,9 +47,12 @@ Generates an HTML tag.
 
 ```twig
 {{ html_tag('div', {class: 'container', id: 'main'}) }}
-{# <div id="main" class="container"></div> #}
+{# <div class="container" id="main"></div> #}
 
 {{ tag('p', {text: 'Hello <world>'}) }}
+{# <p>Hello &lt;world&gt;</p> #}
+
+{{ tag('p', 'Hello <world>') }}
 {# <p>Hello &lt;world&gt;</p> #}
 
 {{ tag('p', {html: '<strong>Bold</strong>'}) }}
@@ -52,8 +60,9 @@ Generates an HTML tag.
 ```
 
 - `text`: HTML-encodes the value and uses it as the tag body.
-- `html`: Uses the value as raw HTML tag body.
+- `html`: Uses the value as raw HTML tag body. Takes precedence over `text`.
 - All other keys are rendered as HTML attributes.
+- Passing a string instead of a hash is a shortcut for `{text: '...'}`.
 
 ### `html_attr` / `attr`
 
@@ -86,8 +95,24 @@ Modifies the attributes of an existing HTML tag string.
 
 ```twig
 {{ '<div class="old">'|attr({class: 'new', id: 'test'}) }}
-{# <div id="test" class="old new"> #}
+{# <div class="old new" id="test"> #}
 ```
+
+If the string doesn't contain an HTML tag, it's returned unchanged.
+
+### `html_remove_class` / `remove_class`
+
+Removes a class (or classes) from an existing HTML tag string. If no classes remain, the `class` attribute is removed.
+
+```twig
+{{ '<div class="a b c">'|remove_class('b') }}
+{# <div class="a c"> #}
+
+{{ '<button class="btn btn-primary active">Save</button>'|remove_class(['btn-primary', 'active']) }}
+{# <button class="btn">Save</button> #}
+```
+
+If the string doesn't contain an HTML tag, it's returned unchanged.
 
 ### `merge_attributes`
 
@@ -98,8 +123,8 @@ Merges two attribute arrays with optional class deduplication and Tailwind class
 {% set extra = {class: 'p-2 font-bold', 'hx-get': '/api'} %}
 
 {# Basic merge — deduplicates classes and resolves Tailwind conflicts by default #}
-<div{{ base|merge_attributes(extra)|attr }}>
-{# <div id="hero" class="text-red-500 p-2 font-bold" hx-get="/api"> #}
+<div{{ attr(base|merge_attributes(extra)) }}>
+{# <div class="text-red-500 p-2 font-bold" id="hero" hx-get="/api"> #}
 
 {# Override options per call #}
 {% set merged = base|merge_attributes(extra, {tailwind_merge: false}) %}
@@ -129,7 +154,7 @@ Merges Tailwind CSS classes, intelligently resolving conflicts.
 
 ### `{% html_tag %}` / `{% tag %}`
 
-Block-level tag generation. Captures content between the tags.
+Block-level tag generation. Captures content between the tags. Each tag closes with its own end tag: `{% tag %}` with `{% endtag %}`, `{% html_tag %}` with `{% endhtml_tag %}`.
 
 ```twig
 {% tag 'nav' with {class: 'main-nav', role: 'navigation'} %}
@@ -149,18 +174,20 @@ Attributes are normalized automatically:
 - **`class`** strings are split into arrays and deduplicated on merge.
 - **`style`** strings are parsed into property/value pairs.
 - **Data attributes** like `data-foo` are collapsed into `data: {foo: ...}`.
-- **`removeClass`** pseudo-attribute removes classes:
+- **`remove_class`** pseudo-attribute removes classes from the `class` value in the same hash:
 
 ```twig
-{{ '<div class="a b c">'|attr({removeClass: 'b'}) }}
-{# <div class="a c"> #}
+{{ tag('div', {class: 'a b c', remove_class: 'b'}) }}
+{# <div class="a c"></div> #}
 ```
+
+It doesn't remove classes already on a tag passed to `|attr`. Use the [`remove_class`](#html_remove_class--remove_class) filter for that.
 
 Supported data attribute prefixes: `aria`, `data`, `data-hx`, `data-ng`, `hx`, `ng`.
 
-## Provenance
+## Credits
 
-Some code in this package is ported from [Craft CMS](https://github.com/craftcms/cms). See [PROVENANCE.md](PROVENANCE.md) for details on what was ported and from which commit.
+The tag and attribute helpers are ported from [Craft CMS](https://github.com/craftcms/cms).
 
 ## License
 

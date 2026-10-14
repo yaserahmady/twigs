@@ -1,0 +1,82 @@
+---
+title: Building components
+description: Build a reusable Twig component with cva() for class variants, merge_attributes to accept the caller's attributes, and the tag block to render it.
+sidebar:
+  order: 2
+---
+
+A reusable component needs three things: classes that depend on its options, a way for the caller to add or override attributes, and markup. This guide builds a button with one helper for each:
+
+1. [`cva()`](/reference/functions#cva) picks classes from the `variant` and `size` options.
+2. [`|merge_attributes`](/reference/filters#merge_attributes) combines the component's attributes with the caller's.
+3. [`{% tag %}`](/reference/tags) renders the element around the label.
+
+## The component
+
+```twig components/button.twig
+{% set button = cva(
+    base: 'inline-flex items-center rounded-md font-medium',
+    variants: {
+        variant: {
+            primary: 'bg-blue-600 text-white',
+            ghost: 'bg-transparent text-blue-600',
+        },
+        size: {
+            sm: 'px-2 py-1 text-sm',
+            md: 'px-4 py-2',
+        },
+    },
+    defaultVariant: {variant: 'primary', size: 'md'},
+) %}
+
+{% set attrs = {
+    type: 'button',
+    class: button.apply({variant: variant ?? null, size: size ?? null}),
+}|merge_attributes(attributes ?? {}) %}
+
+{% tag 'button' with attrs %}{{ label }}{% endtag %}
+```
+
+A `null` option falls back to `defaultVariant`, so callers only pass the options they want to change.
+
+## Using it
+
+With only a label, the button uses the default variant and size:
+
+```twig
+{% include 'components/button.twig' with {label: 'Save'} only %}
+{# <button type="button" class="inline-flex items-center rounded-md font-medium bg-blue-600 text-white px-4 py-2">Save</button> #}
+```
+
+The caller can pick options and pass extra attributes:
+
+```twig
+{% include 'components/button.twig' with {
+    label: 'Delete',
+    variant: 'ghost',
+    size: 'sm',
+    attributes: {class: 'px-6', 'hx-delete': '/item/1', disabled: true},
+} only %}
+{# <button type="button" class="inline-flex items-center rounded-md font-medium bg-transparent text-blue-600 py-1 text-sm px-6" disabled hx-delete="/item/1">Delete</button> #}
+```
+
+Here's what `|merge_attributes` did with the caller's hash:
+
+- `px-6` replaced the size's `px-2`, because Tailwind merging lets the later class win.
+- `hx-delete` and `disabled` were added.
+- `type` stayed `button`, since the caller didn't set it. A caller who sets `type: 'submit'` overrides it.
+
+:::note
+The label goes through Twig's normal autoescaping. To accept HTML content instead, use `{% embed %}` with a block, or pass pre-rendered HTML and print it with `|raw`, the same as in any Twig template.
+:::
+
+## Without Tailwind
+
+The same pattern works with any CSS. Turn off Tailwind merging so the caller's classes are appended instead of resolved:
+
+```twig
+<div{{ attr({class: 'card card-sm'}|merge_attributes({class: 'card-lg'}, {tailwind_merge: false})) }}>
+{# <div class="card card-sm card-lg"> #}
+```
+
+To turn it off everywhere, set [`mergeOptions`](/configuration#mergeoptions) on the extension.

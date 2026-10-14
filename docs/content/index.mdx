@@ -1,0 +1,69 @@
+---
+title: Introduction
+description: eSheep Twigs is a framework-agnostic Twig extension that adds HTML tag and attribute helpers, class variants (CVA), and Tailwind class merging through one extension class.
+sidebar:
+  order: 1
+---
+
+:::warning[Alpha software, not ready for public use]
+Twigs is built for my agency's own projects. Names, behavior and output can change in any release, without notice or upgrade notes.
+:::
+
+eSheep Twigs (`esheep/twigs`) is a single Twig extension for building HTML in templates. Register one class and you get:
+
+- **`tag()` and `{% tag %}`** to build an element from a tag name and an attribute hash.
+- **`attr()`** to render an attribute hash inside a tag you write by hand.
+- **`|attr` and `|remove_class`** to change the attributes of an HTML string you already have.
+- **`|merge_attributes`** to combine a component's attributes with the ones its caller passes in.
+- **`cva()`** to define class variants for components.
+- **`|tailwind_merge`** to resolve conflicting Tailwind CSS classes.
+- **`ray()`** to send values to Spatie Ray while debugging.
+
+It works with any `Twig\Environment`, in plain PHP or inside a framework.
+
+## A quick look
+
+```twig
+{{ tag('a', {href: '/docs', class: ['link', 'link-primary'], text: 'Docs'}) }}
+{# <a href="/docs" class="link link-primary">Docs</a> #}
+
+<input{{ attr({type: 'checkbox', name: 'agree', checked: true, disabled: false}) }}>
+{# <input type="checkbox" name="agree" checked> #}
+
+{{ '<div class="a b c">'|remove_class('b') }}
+{# <div class="a c"> #}
+
+{{ 'px-2 py-1 bg-red-500'|tw_merge('p-4') }}
+{# bg-red-500 p-4 #}
+```
+
+## Names and aliases
+
+Every helper has a short name and a long `html_*` or `tailwind_*` name. They behave the same: `tag()` is `html_tag()`, `|tw_merge` is `|tailwind_merge`, and so on. The [reference](/reference/functions) lists both.
+
+Other extensions can't take these names over. twig/html-extra, for example, also defines `html_attr()` and `html_cva()`, but templates always get this package's versions, whatever order the extensions are registered in. See [Installation](/installation#when-other-extensions-use-the-same-names).
+
+<Visibility for="agents">
+Agents writing templates with this package: read the [attribute hash guide](/guides/attributes) first, since every helper accepts that format. `|merge_attributes` returns a hash, not a string: render it with `attr()`, `tag()` or `{% tag %}`. A `{% html_tag %}` block closes with `{% endhtml_tag %}`, and a `{% tag %}` block with `{% endtag %}`.
+</Visibility>
+
+## Where to next
+
+<CardGroup cols={2}>
+  <Card title="Installation" href="/installation" icon="download">
+    Install with Composer and register the extension.
+  </Card>
+  <Card title="Attribute hashes" href="/guides/attributes" icon="braces">
+    The attribute format every helper accepts.
+  </Card>
+  <Card title="Building components" href="/guides/components" icon="blocks">
+    Combine `cva()`, `|merge_attributes` and `{% tag %}`.
+  </Card>
+  <Card title="Reference" href="/reference/functions" icon="book-open">
+    Every function, filter and tag.
+  </Card>
+</CardGroup>
+
+## Credits
+
+The tag and attribute helpers are ported from [Craft CMS](https://github.com/craftcms/cms). `cva()` comes from [twig/html-extra](https://github.com/twigphp/html-extra), and Tailwind merging from [tailwind-merge-php](https://github.com/tales-from-a-dev/tailwind-merge-php).

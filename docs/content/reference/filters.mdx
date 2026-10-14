@@ -1,0 +1,155 @@
+---
+title: Filters
+description: Reference for the attr, remove_class, merge_attributes, tailwind_merge and ray Twig filters in eSheep Twigs — arguments, merge rules, options and examples.
+sidebar:
+  order: 2
+---
+
+## `attr`
+
+Alias: `html_attr`
+
+```twig
+html_string|attr(attributes)
+```
+
+Changes the attributes of the first HTML tag in a string. The rest of the string, including the element's content, is left as it is. Comments and doctypes before the tag are skipped.
+
+How each attribute in the [hash](/guides/attributes) is applied:
+
+- **`class`**: added to the existing classes, without duplicates.
+- **`style`**: merged property by property. A new value replaces the old one.
+- **Any other attribute**: replaced.
+- **`false` or `null`**: removes the attribute.
+
+```twig
+{{ '<div class="old">'|attr({class: 'new', id: 'test'}) }}
+{# <div class="old new" id="test"> #}
+
+{{ '<a class="btn" href="/x">Go</a><span>2</span>'|attr({target: '_blank'}) }}
+{# <a class="btn" href="/x" target="_blank">Go</a><span>2</span> #}
+
+{{ '<div class="a b" id="x">'|attr({class: false}) }}
+{# <div id="x"> #}
+
+{{ '<div style="color: red">'|attr({style: {background: 'blue'}}) }}
+{# <div style="color: red; background: blue;"> #}
+```
+
+A string without an HTML tag is returned unchanged:
+
+```twig
+{{ 'plain text'|attr({class: 'x'}) }}
+{# plain text #}
+```
+
+A `remove_class` key here doesn't remove classes already on the tag. Use [`|remove_class`](#remove_class) for that.
+
+## `remove_class`
+
+Alias: `html_remove_class`
+
+```twig
+html_string|remove_class(class)
+```
+
+Removes one class, or a list of classes, from the first HTML tag in a string. If no classes are left, the `class` attribute is removed too. A string without an HTML tag is returned unchanged.
+
+```twig
+{{ '<div class="a b c">'|remove_class('b') }}
+{# <div class="a c"> #}
+
+{{ '<div class="a b c">'|remove_class(['a', 'c']) }}
+{# <div class="b"> #}
+
+{{ '<div class="a" id="x">'|remove_class('a') }}
+{# <div id="x"> #}
+```
+
+## `merge_attributes`
+
+```twig
+base|merge_attributes(attributes, options = {})
+```
+
+Merges two [attribute hashes](/guides/attributes) and returns the merged hash. It doesn't render anything: pass the result to `attr()`, `tag()` or `{% tag %}`. Both arguments can be hashes or any iterable.
+
+How the two hashes are combined:
+
+- **`class`**: the classes of `attributes` are appended to those of `base`.
+- **`style`, `data`, `aria`, `hx` and the other prefixes**: merged key by key. Values from `attributes` win.
+- **Any other attribute**: the value from `attributes` wins.
+
+Then, depending on the options, repeated classes are removed and conflicting Tailwind classes are resolved, with later classes winning.
+
+```twig
+<div{{ attr({class: 'p-4 text-red-500', id: 'hero'}|merge_attributes({class: 'p-2 font-bold', 'hx-get': '/api'})) }}>
+{# <div class="text-red-500 p-2 font-bold" id="hero" hx-get="/api"> #}
+
+<div{{ attr({style: {color: 'red', margin: 0}}|merge_attributes({style: 'color: blue'})) }}>
+{# <div style="color: blue; margin: 0;"> #}
+
+<div{{ attr({data: {a: 1}, id: 'x'}|merge_attributes({'data-b': 2, id: 'y'})) }}>
+{# <div data-a="1" data-b="2" id="y"> #}
+```
+
+### Options
+
+| Key | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `remove_duplicate_classes` | `bool` | `true` | Removes repeated class names after merging. |
+| `tailwind_merge` | `bool` | `true` | Resolves conflicting Tailwind classes after merging. |
+
+Options passed here override the extension's [`mergeOptions`](/configuration#mergeoptions):
+
+```twig
+<div{{ attr({class: 'p-4 p-4 a'}|merge_attributes({class: 'p-2 a'}, {tailwind_merge: false})) }}>
+{# <div class="p-4 a p-2"> #}
+```
+
+### The result is normalized
+
+The returned hash is in normalized form: `class` is a list, `style` is a hash of properties, and prefixed attributes such as `hx-get` are nested under their prefix (`hx: {get: ...}`). Printing `merged.class` directly prints `Array` and triggers a PHP warning. Render the whole hash with `attr()`, or join the list yourself:
+
+```twig
+{% set merged = {class: 'x y'}|merge_attributes({id: 'z'}) %}{{ merged.class|join(' ') }}
+{# x y #}
+```
+
+A `remove_class` key only affects the `class` in its own hash. It can't remove classes that come from the other hash.
+
+## `tailwind_merge`
+
+Alias: `tw_merge`
+
+```twig
+classes|tailwind_merge(...more_classes)
+```
+
+Joins class strings and resolves Tailwind CSS conflicts: when two classes set the same thing, the later one wins. Each extra argument can be a string or a list of strings.
+
+```twig
+{{ 'px-2 py-1 bg-red-500'|tw_merge('p-4') }}
+{# bg-red-500 p-4 #}
+
+{{ 'text-red-500'|tw_merge('text-blue-500') }}
+{# text-blue-500 #}
+
+{{ 'p-2'|tailwind_merge('p-4', 'mt-2') }}
+{# p-4 mt-2 #}
+
+{{ 'p-2 hover:p-4 hover:p-6'|tw_merge }}
+{# p-2 hover:p-6 #}
+```
+
+Merging uses [tailwind-merge-php](https://github.com/tales-from-a-dev/tailwind-merge-php) with its default configuration. To use your own configuration, [inject an instance](/configuration#tailwindmerge).
+
+## `ray`
+
+```twig
+value|ray(...more_values)
+```
+
+Sends the value, and any extra arguments, to Spatie Ray or to PHP's error log, like the [`ray()` function](/reference/functions#ray). Then it returns the value unchanged, so you can add `|ray` to any expression without changing the page: `{{ user.name|ray }}` prints the same as `{{ user.name }}`, escaping included.
+
+It works inside other expressions too, such as `{% set total = (price * quantity)|ray %}`.
